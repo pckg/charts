@@ -1,0 +1,19 @@
+{
+  "name": "pckg/charts",
+  "description": "Pckg Chart.js implementation",
+  "homepage": "https://github.com/pckg/charts",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Bojan Rajh",
+      "email": "schtr4jh@schtr4jh.net"
+    }
+  ],
+  "require": {},
+  "autoload": {
+    "psr-0": {
+      "Pckg": "src\\"
+    }
+  },
+  "minimum-stability": "dev"
+}

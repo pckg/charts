@@ -61,12 +61,12 @@ class TimeChart
     {
         $minDate = date('Y-m-d', strtotime('-3 months'));
         $maxDate = date('Y-m-d', strtotime('+1 day'));
-
+        
         $data = $this->entity->select(
             [
                 'status' => Raw::raw($this->status),
                 'step'   => Raw::raw($this->step),
-                'count'  => 'COUNT(id)',
+                'count'  => 'COUNT(' . $this->entity->getTable() . '.id)',
             ]
         )
                              ->groupBy('step, status')

@@ -22,6 +22,15 @@ class TimeChart
 
     protected $dataStep;
 
+    protected $dimension = null;
+
+    public function setDimension($dimension)
+    {
+        $this->dimension = $dimension;
+
+        return $this;
+    }
+
     public function setEntity(Entity $entity)
     {
         $this->entity = $entity;
@@ -61,17 +70,23 @@ class TimeChart
     {
         $minDate = date('Y-m-d', strtotime('-3 months'));
         $maxDate = date('Y-m-d', strtotime('+1 day'));
-        
-        $data = $this->entity->select(
+
+        $entity = $this->entity->select(
             [
                 'status' => Raw::raw($this->status),
                 'step'   => Raw::raw($this->step),
-                'count'  => 'COUNT(' . $this->entity->getTable() . '.id)',
+                'count'  => !$this->dimension
+                    ? 'COUNT(' . $this->entity->getTable() . '.id)'
+                    : $this->dimension,
             ]
         )
-                             ->groupBy('step, status')
-                             ->where($this->timeField, $minDate, '>')
-                             ->all();
+                               ->groupBy('step, status');
+
+        if ($this->timeField) {
+            $entity->where($this->timeField, $minDate, '>');
+        }
+
+        $data = $entity->all();
 
         $date = new Carbon($minDate);
         $times = [];

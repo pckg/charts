@@ -1,6 +1,6 @@
 {
   "name": "pckg/charts",
-  "description": "Pckg Chart.js implementation",
+  "description": "Bridge for building charts with php using Charts.js javascript library",
   "homepage": "https://github.com/pckg/charts",
   "license": "MIT",
   "authors": [
@@ -9,7 +9,6 @@
       "email": "schtr4jh@schtr4jh.net"
     }
   ],
-  "require": {},
   "autoload": {
     "psr-0": {
       "Pckg": "src\\"

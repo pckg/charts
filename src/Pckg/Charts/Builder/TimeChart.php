@@ -73,7 +73,7 @@ class TimeChart
 
         $entity = $this->entity->select(
             [
-                'status' => Raw::raw($this->status),
+                'status' => is_object($this->status) ? $this->status : Raw::raw($this->status),
                 'step'   => Raw::raw($this->step),
                 'count'  => !$this->dimension
                     ? 'COUNT(' . $this->entity->getTable() . '.id)'

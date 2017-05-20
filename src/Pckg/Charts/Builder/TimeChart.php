@@ -72,7 +72,7 @@ class TimeChart
             $entity = $this->entity;
         }
 
-        $minDate = date('Y-m-d', strtotime('-24 months'));
+        //$minDate = date('Y-m-d', strtotime('-6 months'));
 
         $entity->select(
             [
@@ -86,7 +86,7 @@ class TimeChart
                ->groupBy('step, status');
 
         if ($this->timeField) {
-            $entity->where($this->timeField, $minDate, '>');
+            //$entity->where($this->timeField, $minDate, '>');
         }
 
         return $entity;
@@ -94,96 +94,11 @@ class TimeChart
 
     public function getData()
     {
-        $minDate = date('Y-m-d', strtotime('-24 months'));
-        $maxDate = date('Y-m-d', strtotime('+1 day'));
         $this->prepareSelect();
         $data = $this->entity->all();
 
-        $date = new Carbon($minDate);
-        $times = [];
-        /**
-         * Prepare times.
-         */
-        while ($maxDate > $date) {
-            // fill times and increase date
-            $callback = $this->carbonStep;
-            $callback($date, $times);
-        }
-
-        $statuses = [];
-        $data->each(
-            function($record) use (&$times, &$statuses) {
-                $times[$record->step][$record->status] = $record->count;
-                $statuses[$record->status][$record->step] = $record->count;
-            }
-        );
-
-        $chart = [
-            'labels'   => array_keys($times),
-            'datasets' => [],
-        ];
-
-        $clrs = [
-            'rgba(0, 255, 0, 0.5)',
-            'rgba(255, 0, 0, 0.5)',
-            'rgba(0, 0, 255, 0.5)',
-            'rgba(100, 100, 100, 0.5)',
-            'rgba(50, 50, 50, 0.5)',
-        ];
-        $colors = [
-            'total' => 'rgba(0, 0, 0, 0.5)',
-        ];
-        foreach (array_keys($statuses) as $status) {
-            if ($clrs) {
-                $colors[$status] = array_pop($clrs);
-            } else {
-                $colors[$status] = 'rgba(' . rand(0, 255) . ', ' . rand(0, 255) . ', ' . rand(0, 255) . ', 0.5)';
-            }
-        }
-
-        foreach ($statuses as $status => $statusTimes) {
-            $dataset = [
-                'label'           => $status,
-                'data'            => [],
-                'borderColor'     => $colors[$status],
-                'backgroundColor' => 'transparent',
-                'borderWidth'     => 2,
-            ];
-            foreach ($times as $time => $timeStatuses) {
-                $dataset['data'][] = $statusTimes[$time] ?? 0;
-            }
-            $chart['datasets'][] = $dataset;
-        }
-        $dataset = [
-            'label'           => 'total',
-            'data'            => [],
-            'borderColor'     => $colors['total'],
-            'backgroundColor' => 'transparent',
-            'borderWidth'     => 1,
-        ];
-        foreach ($times as $time => $statuses) {
-            $total = 0;
-            foreach ($statuses as $status) {
-                $total += $status;
-            }
-            $dataset['data'][] = $total;
-        }
-        $chart['datasets'][] = $dataset;
-
-        return $chart;
-    }
-
-}
-
-class TestChart extends TimeChart
-{
-
-    public function getData()
-    {
-        $this->prepareSelect();
-        $data = $this->entity->all();
-        dd($data);
-
+        $minDate = date('Y-m-d', strtotime($data->min($this->timeField)));
+        $maxDate = date('Y-m-d', strtotime($data->max($this->timeField)));
         $date = new Carbon($minDate);
         $times = [];
         /**

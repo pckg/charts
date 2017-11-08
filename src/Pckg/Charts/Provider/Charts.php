@@ -11,7 +11,7 @@ class Charts extends Provider
             /**
              * Chart.js
              */
-            '/bower_components/chart.js/dist/Chart.min.js',
+            '/node_modules/chart.js/dist/Chart.min.js',
         ];
     }
 

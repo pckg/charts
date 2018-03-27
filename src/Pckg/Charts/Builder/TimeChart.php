@@ -78,18 +78,31 @@ class TimeChart
             [
                 'status' => is_object($this->status) ? $this->status : Raw::raw($this->status),
                 'step'   => Raw::raw($this->step),
-                'count'  => !$this->dimension
-                    ? 'COUNT(' . $this->entity->getTable() . '.id)'
-                    : $this->dimension,
             ]
         )
                ->groupBy('step, status');
+
+        $entity->addSelect($this->getDimensions());
 
         if ($this->timeField) {
             //$entity->where($this->timeField, $minDate, '>');
         }
 
         return $entity;
+    }
+
+    private function getDimensions()
+    {
+        $dimensions = [];
+        if (!$this->dimension) {
+            $dimensions['count'] = 'COUNT(' . $this->entity->getTable() . '.id)';
+        } elseif (!is_array($this->dimension)) {
+            $dimensions = ['count' => $this->dimension];
+        } else {
+            $dimensions = $this->dimension;
+        }
+
+        return $dimensions;
     }
 
     public function getData()
@@ -111,10 +124,13 @@ class TimeChart
         }
 
         $statuses = [];
+        $dimensions = $this->getDimensions();
         $data->each(
-            function($record) use (&$times, &$statuses) {
-                $times[$record->step][$record->status] = $record->count;
-                $statuses[$record->status][$record->step] = $record->count;
+            function($record) use (&$times, &$statuses, $dimensions) {
+                foreach ($dimensions as $key => $val) {
+                    $times[$record->step][$record->status][$key] = $record->{$key};
+                    $statuses[$record->status][$record->step][$key] = $record->{$key};
+                }
             }
         );
 
@@ -141,18 +157,20 @@ class TimeChart
             }
         }
 
-        foreach ($statuses as $status => $statusTimes) {
-            $dataset = [
-                'label'           => $status,
-                'data'            => [],
-                'borderColor'     => $colors[$status],
-                'backgroundColor' => 'transparent',
-                'borderWidth'     => 2,
-            ];
-            foreach ($times as $time => $timeStatuses) {
-                $dataset['data'][] = $statusTimes[$time] ?? 0;
+        foreach ($dimensions as $dimensionKey => $dimVal) {
+            foreach ($statuses as $status => $statusTimes) {
+                $dataset = [
+                    'label'           => $status . '-' . $dimensionKey,
+                    'data'            => [],
+                    'borderColor'     => $colors[$status],
+                    'backgroundColor' => 'transparent',
+                    'borderWidth'     => 2,
+                ];
+                foreach ($times as $time => $timeStatuses) {
+                    $dataset['data'][] = $statusTimes[$time][$dimensionKey] ?? 0;
+                }
+                $chart['datasets'][] = $dataset;
             }
-            $chart['datasets'][] = $dataset;
         }
         $dataset = [
             'label'           => 'total',
@@ -161,12 +179,14 @@ class TimeChart
             'backgroundColor' => 'transparent',
             'borderWidth'     => 1,
         ];
-        foreach ($times as $time => $statuses) {
-            $total = 0;
-            foreach ($statuses as $status) {
-                $total += $status;
+        foreach ($dimensions as $dimensionKey => $dimVal) {
+            foreach ($times as $time => $statuses) {
+                $total = 0;
+                foreach ($statuses as $status) {
+                    $total += $status[$dimensionKey];
+                }
+                $dataset['data'][] = $total;
             }
-            $dataset['data'][] = $total;
         }
         $chart['datasets'][] = $dataset;
 

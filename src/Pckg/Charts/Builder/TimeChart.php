@@ -24,6 +24,8 @@ class TimeChart
 
     protected $dimension = null;
 
+    protected $minDate = '-3months';
+
     public function setDimension($dimension)
     {
         $this->dimension = $dimension;
@@ -66,52 +68,35 @@ class TimeChart
         return $this;
     }
 
-    public function prepareSelect(Entity $entity = null)
+    public function setMinDate(string $date)
     {
-        if (!$entity) {
-            $entity = $this->entity;
-        }
+        $this->minDate = $date;
 
-        //$minDate = date('Y-m-d', strtotime('-6 months'));
-
-        $entity->select(
-            [
-                'status' => is_object($this->status) ? $this->status : Raw::raw($this->status),
-                'step'   => Raw::raw($this->step),
-            ]
-        )
-               ->groupBy('step, status');
-
-        $entity->addSelect($this->getDimensions());
-
-        if ($this->timeField) {
-            //$entity->where($this->timeField, $minDate, '>');
-        }
-
-        return $entity;
-    }
-
-    private function getDimensions()
-    {
-        $dimensions = [];
-        if (!$this->dimension) {
-            $dimensions['count'] = 'COUNT(' . $this->entity->getTable() . '.id)';
-        } elseif (!is_array($this->dimension)) {
-            $dimensions = ['count' => $this->dimension];
-        } else {
-            $dimensions = $this->dimension;
-        }
-
-        return $dimensions;
+        return $this;
     }
 
     public function getData()
     {
-        $this->prepareSelect();
-        $data = $this->entity->all();
+        $minDate = date('Y-m-d 00:00:00', strtotime($this->minDate));
+        $maxDate = date('Y-m-d 00:00:00', strtotime('+1 day'));
 
-        $minDate = date('Y-m-d', strtotime($data->min($this->timeField)));
-        $maxDate = date('Y-m-d', strtotime($data->max($this->timeField)));
+        $entity = $this->entity->select(
+            [
+                'status' => Raw::raw($this->status),
+                'step' => Raw::raw($this->step),
+                'count' => !$this->dimension
+                    ? 'COUNT(' . $this->entity->getTable() . '.id)'
+                    : $this->dimension,
+            ]
+        )
+            ->groupBy('step, status');
+
+        if ($this->timeField) {
+            $entity->where($this->timeField, $minDate, '>');
+        }
+
+        $data = $entity->all();
+
         $date = new Carbon($minDate);
         $times = [];
         /**
@@ -119,32 +104,31 @@ class TimeChart
          */
         while ($maxDate > $date) {
             // fill times and increase date
-            $callback = $this->carbonStep;
-            $callback($date, $times);
+            ($this->carbonStep)($date, $times);
         }
 
         $statuses = [];
-        $dimensions = $this->getDimensions();
         $data->each(
-            function($record) use (&$times, &$statuses, $dimensions) {
-                foreach ($dimensions as $key => $val) {
-                    $times[$record->step][$record->status][$key] = $record->{$key};
-                    $statuses[$record->status][$record->step][$key] = $record->{$key};
-                }
+            function ($record) use (&$times, &$statuses) {
+                $times[$record->step][$record->status] = $record->count;
+                $statuses[$record->status][$record->step] = $record->count;
             }
         );
 
         $chart = [
-            'labels'   => array_keys($times),
+            'labels' => array_keys($times),
             'datasets' => [],
         ];
 
         $clrs = [
-            'rgba(0, 255, 0, 0.5)',
             'rgba(255, 0, 0, 0.5)',
+            'rgba(0, 255, 0, 0.5)',
             'rgba(0, 0, 255, 0.5)',
-            'rgba(100, 100, 100, 0.5)',
-            'rgba(50, 50, 50, 0.5)',
+            'rgba(127, 127, 127, 0.5)',
+            'rgba(255, 255, 0, 0.5)',
+            'rgba(0, 255, 255, 0.5)',
+            'rgba(255, 0, 255, 0.5)',
+            'rgba(0, 0, 0, 0.5)',
         ];
         $colors = [
             'total' => 'rgba(0, 0, 0, 0.5)',
@@ -157,36 +141,32 @@ class TimeChart
             }
         }
 
-        foreach ($dimensions as $dimensionKey => $dimVal) {
-            foreach ($statuses as $status => $statusTimes) {
-                $dataset = [
-                    'label'           => $status . '-' . $dimensionKey,
-                    'data'            => [],
-                    'borderColor'     => $colors[$status],
-                    'backgroundColor' => 'transparent',
-                    'borderWidth'     => 2,
-                ];
-                foreach ($times as $time => $timeStatuses) {
-                    $dataset['data'][] = $statusTimes[$time][$dimensionKey] ?? 0;
-                }
-                $chart['datasets'][] = $dataset;
+        foreach ($statuses as $status => $statusTimes) {
+            $dataset = [
+                'label' => $status,
+                'data' => [],
+                'borderColor' => $colors[$status],
+                'backgroundColor' => 'transparent',
+                'borderWidth' => 2,
+            ];
+            foreach ($times as $time => $timeStatuses) {
+                $dataset['data'][] = $statusTimes[$time] ?? 0;
             }
+            $chart['datasets'][] = $dataset;
         }
         $dataset = [
-            'label'           => 'total',
-            'data'            => [],
-            'borderColor'     => $colors['total'],
+            'label' => 'total',
+            'data' => [],
+            'borderColor' => $colors['total'],
             'backgroundColor' => 'transparent',
-            'borderWidth'     => 1,
+            'borderWidth' => 1,
         ];
-        foreach ($dimensions as $dimensionKey => $dimVal) {
-            foreach ($times as $time => $statuses) {
-                $total = 0;
-                foreach ($statuses as $status) {
-                    $total += $status[$dimensionKey];
-                }
-                $dataset['data'][] = $total;
+        foreach ($times as $time => $statuses) {
+            $total = 0;
+            foreach ($statuses as $status) {
+                $total += $status;
             }
+            $dataset['data'][] = $total;
         }
         $chart['datasets'][] = $dataset;
 

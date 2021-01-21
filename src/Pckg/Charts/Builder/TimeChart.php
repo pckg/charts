@@ -26,6 +26,8 @@ class TimeChart
 
     protected $minDate = '-3months';
 
+    protected $groupBy;
+
     public function setDimension($dimension)
     {
         $this->dimension = $dimension;
@@ -75,6 +77,25 @@ class TimeChart
         return $this;
     }
 
+    public function setGroupBy(string $groupBy)
+    {
+        $this->groupBy = $groupBy;
+
+        return $this;
+    }
+
+    public function setStack(string $stack)
+    {
+        $this->stack = $stack;
+
+        return $this;
+    }
+
+    public function getStatus()
+    {
+        return $this->status;
+    }
+
     public function getData()
     {
         $minDate = date('Y-m-d 00:00:00', strtotime($this->minDate));
@@ -89,10 +110,16 @@ class TimeChart
                     : $this->dimension,
             ]
         )
-            ->groupBy('step, status');
+            ->groupBy($this->groupBy ?? 'step, status');
+
+        if ($this->stack) {
+            $entity->addSelect([
+                'stack' => $this->stack,
+            ]);
+        }
 
         if ($this->timeField) {
-            $entity->where($this->timeField, $minDate, '>');
+            $entity->where($entity->getTable() . '.' . $this->timeField, $minDate, '>');
         }
 
         $data = $entity->all();
@@ -108,10 +135,13 @@ class TimeChart
         }
 
         $statuses = [];
+        $explodedStatus = explode('.', $this->status);
+        $realStatus = end($explodedStatus);
         $data->each(
-            function ($record) use (&$times, &$statuses) {
-                $times[$record->step][$record->status] = $record->count;
-                $statuses[$record->status][$record->step] = $record->count;
+            function ($record) use (&$times, &$statuses, $realStatus) {
+                $addition = $this->groupBy ? (':' . $record->stack) : '';
+                $times[$record->step][$record->{$realStatus} . $addition] = $record->count;
+                $statuses[$record->{$realStatus} . $addition][$record->step] = $record->count;
             }
         );
 

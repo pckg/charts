@@ -28,6 +28,8 @@ class TimeChart
 
     protected $groupBy;
 
+    protected $stack;
+
     public function setDimension($dimension)
     {
         $this->dimension = $dimension;

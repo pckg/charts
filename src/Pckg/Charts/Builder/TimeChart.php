@@ -107,12 +107,17 @@ class TimeChart
             [
                 'status' => Raw::raw($this->status),
                 'step' => Raw::raw($this->step),
-                'count' => !$this->dimension
-                    ? 'COUNT(' . $this->entity->getTable() . '.id)'
-                    : $this->dimension,
             ]
         )
             ->groupBy($this->groupBy ?? 'step, status');
+
+        if (!$this->dimension) {
+            $entity->addSelect(['count' => 'COUNT(' . $this->entity->getTable() . '.id)']);
+        } else if (is_array($this->dimension)) {
+            foreach ($this->dimension as $k => $dim) {
+                $entity->addSelect([$k => $dim]);
+            }
+        }
 
         if ($this->stack) {
             $entity->addSelect([
@@ -138,12 +143,19 @@ class TimeChart
 
         $statuses = [];
         $explodedStatus = explode('.', $this->status);
-        $realStatus = end($explodedStatus);
+        $realStatus = count($explodedStatus) > 2 ? 'status' : end($explodedStatus);
         $data->each(
             function ($record) use (&$times, &$statuses, $realStatus) {
                 $addition = $this->groupBy ? (':' . $record->stack) : '';
-                $times[$record->step][$record->{$realStatus} . $addition] = $record->count;
-                $statuses[$record->{$realStatus} . $addition][$record->step] = $record->count;
+                if (!$this->dimension) {
+                    $times[$record->step][$record->{$realStatus} . $addition] = $record->count;
+                    $statuses[$record->{$realStatus} . $addition][$record->step] = $record->count;
+                } else if (is_array($this->dimension)) {
+                    foreach ($this->dimension as $k => $dim) {
+                        $times[$record->step][$record->{$realStatus} . $addition . ':' . $k] = $record->{$k};
+                        $statuses[$record->{$realStatus} . $addition . ':' . $k][$record->step] = $record->{$k};
+                    }
+                }
             }
         );
 
